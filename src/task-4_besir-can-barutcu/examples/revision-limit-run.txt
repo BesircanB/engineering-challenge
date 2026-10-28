@@ -1,0 +1,27 @@
+# Real output, recorded on 29 Oct 2026. Each command ran as a separate Python process on one SQLite file.
+
+$ python -m workflow run content-001 --scenario revision-limit --run-id run-002
+Run: run-002  (content: content-001, scenario: revision-limit)
+
+Evaluation completed
+Decision: revise (The 70 percent saving is not supported by evidence.)
+
+Revision attempt: 1
+
+Evaluation completed
+Decision: revise (The claim is still too general.)
+
+Revision attempt: 2
+
+Evaluation completed
+Decision: revise (The issue remains unresolved.)
+
+Maximum revision attempts reached (2).
+
+Workflow stopped. Status: REVISION_LIMIT_REACHED
+[exit code 0]
+
+$ python -m workflow approve run-002
+Run 'run-002' cannot be approved. Status: REVISION_LIMIT_REACHED
+[exit code 1]
+
