@@ -1,11 +1,12 @@
-"""Routing through the graph, using an in-memory checkpointer."""
+"""Routing through the graph. Every test runs twice: in memory and on a SQLite file."""
 
+from contextlib import ExitStack
 from dataclasses import dataclass
 
 import pytest
 from langgraph.checkpoint.memory import InMemorySaver
 
-from workflow.fakes import ScriptedEvaluator, ScriptedReviser
+from tests.helpers import CountingEvaluator, CountingReviser
 from workflow.graph import (
     NotWaitingForReviewError,
     RunExistsError,
@@ -17,33 +18,13 @@ from workflow.graph import (
     start_run,
 )
 from workflow.models import load_content, load_scenario
-from workflow.store import InMemoryEventLog
-
-
-class CountingEvaluator(ScriptedEvaluator):
-    def __init__(self, scenario):
-        super().__init__(scenario)
-        self.calls = 0
-
-    def evaluate(self, item, step):
-        self.calls += 1
-        return super().evaluate(item, step)
-
-
-class CountingReviser(ScriptedReviser):
-    def __init__(self, scenario):
-        super().__init__(scenario)
-        self.calls = 0
-
-    def revise(self, item, step):
-        self.calls += 1
-        return super().revise(item, step)
+from workflow.store import EventLog, InMemoryEventLog, open_storage
 
 
 @dataclass
 class Harness:
     graph: object
-    events: InMemoryEventLog
+    events: EventLog
     evaluator: CountingEvaluator
     reviser: CountingReviser
     scenario_id: str
@@ -62,17 +43,23 @@ class Harness:
         return self.graph.get_state({"configurable": {"thread_id": run_id}})
 
 
-@pytest.fixture
-def harness():
-    def make(scenario_id):
-        scenario = load_scenario(scenario_id)
-        events = InMemoryEventLog()
-        evaluator = CountingEvaluator(scenario)
-        reviser = CountingReviser(scenario)
-        graph = build_graph(evaluator, reviser, events, InMemorySaver())
-        return Harness(graph, events, evaluator, reviser, scenario_id)
+@pytest.fixture(params=["memory", "sqlite"])
+def harness(request, tmp_path):
+    with ExitStack() as stack:
 
-    return make
+        def make(scenario_id):
+            if request.param == "memory":
+                checkpointer, events = InMemorySaver(), InMemoryEventLog()
+            else:
+                storage = stack.enter_context(open_storage(tmp_path / "workflow.db"))
+                checkpointer, events = storage.checkpointer, storage.events
+            scenario = load_scenario(scenario_id)
+            evaluator = CountingEvaluator(scenario)
+            reviser = CountingReviser(scenario)
+            graph = build_graph(evaluator, reviser, events, checkpointer)
+            return Harness(graph, events, evaluator, reviser, scenario_id)
+
+        yield make
 
 
 # --- required checks -------------------------------------------------------

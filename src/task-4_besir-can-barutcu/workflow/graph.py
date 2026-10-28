@@ -22,6 +22,10 @@ from .store import EventLog
 
 APPROVE = "approve"
 
+# start_run and approve_run pass durability="sync": each checkpoint is written before
+# the next step starts, so a crash loses at most the step that was running. That step
+# runs again on resume, and its event is not logged twice (same op_key).
+
 
 class UnknownRunError(LookupError):
     """No saved run has this run id."""
@@ -159,7 +163,7 @@ def start_run(graph: CompiledStateGraph, events: EventLog, state: WorkflowState)
     if graph.get_state(config).values:
         raise RunExistsError(f"run {run_id!r} already exists")
 
-    graph.invoke(state, config)
+    graph.invoke(state, config, durability="sync")
     snapshot = graph.get_state(config)
     if is_waiting_for_review(snapshot):
         events.record(run_id, "checkpoint_saved", "checkpoint_saved", stage="human_review")
@@ -180,5 +184,5 @@ def approve_run(graph: CompiledStateGraph, events: EventLog, run_id: str) -> str
         )
 
     events.record(run_id, "checkpoint_loaded", "checkpoint_loaded", stage="human_review")
-    graph.invoke(Command(resume=APPROVE), config)
+    graph.invoke(Command(resume=APPROVE), config, durability="sync")
     return "completed"
