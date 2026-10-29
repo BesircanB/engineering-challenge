@@ -91,7 +91,15 @@ Other runs to try:
 
 Without `--run-id`, a random id like `run-3f9a2c` is created and printed. Every command accepts `--db PATH` to use another database file.
 
-Real output from these commands is in [`examples/`](examples/).
+Real output from these commands is in [`examples/`](examples/):
+
+| File | Shows |
+|---|---|
+| [`one-revision-run.txt`](examples/one-revision-run.txt) | `run`, then in new processes: `status`, `approve`, `approve` again, `status` |
+| [`one-revision-events.json`](examples/one-revision-events.json) | the 8 events of that run, with decisions, reasons and times |
+| [`revision-limit-run.txt`](examples/revision-limit-run.txt) | two revisions, the stop at the limit, and `approve` refused |
+| [`revision-limit-events.json`](examples/revision-limit-events.json) | the events of that run, ending with `revision_limit_reached` |
+| [`edge-cases-run.txt`](examples/edge-cases-run.txt) | malformed content, unknown content id, unknown scenario, and the injection item still waiting for review |
 
 ### Commands
 
@@ -133,20 +141,25 @@ The repository's top-level `fixtures/g2-cases.json` belongs to Task 6 and is not
 ### Flow
 
 ```text
-CLI: run ──► validate input (Pydantic) ──invalid──► exit code 1, nothing saved
-                    │
-                    ▼
-               ┌─ evaluate ◄────────────── revise ◄─┐
-               │      │                              │
-               │      ├─ revise, count < max ────────┘
-               │      ├─ revise, count = max ──► limit_reached ──► END  (REVISION_LIMIT_REACHED)
-               │      └─ human_review ──► request_review ──► human_review: interrupt()
-               │                                                  │
-               │                                     checkpoint saved, process exits
-               │                                                  │
-CLI: approve ──┴─ (new process) load checkpoint ──► Command(resume="approve")
-                                                                  │
-                                                     complete ──► END  (COMPLETED)
+Process 1: python -m workflow run <content-id> --scenario <id>
+
+  validate input (Pydantic) ──invalid──► exit code 1, nothing saved
+        │ valid
+        ▼
+  START ──► evaluate ◄─────────────────────────────┐
+               │                                   │
+               ├─ revise, count < max ──► revise ──┘  (count + 1)
+               ├─ revise, count = max ──► limit_reached ──► END  (REVISION_LIMIT_REACHED)
+               └─ human_review ──► request_review ──► human_review: interrupt()
+                                                               │
+                                              checkpoint saved, process exits
+
+────────────────────────────────────────────────────────────────────────────────
+
+Process 2: python -m workflow approve <run-id>
+
+  load checkpoint ──► Command(resume="approve") ──► human_review ──► complete ──► END  (COMPLETED)
+                      (evaluate and revise do not run again)
 ```
 
 ### Workflow state

@@ -100,16 +100,20 @@ def _print_progress(events: list[dict[str, Any]]) -> None:
 def cmd_run(args: argparse.Namespace) -> None:
     try:
         item = load_content(args.content_id)
+    except FixtureNotFoundError as exc:
+        raise CommandError(f"Unknown content id '{args.content_id}'.") from exc
     except ValidationError as exc:
         raise CommandError(_validation_message(f"content item '{args.content_id}'", exc)) from exc
     try:
         scenario = load_scenario(args.scenario)
+    except FixtureNotFoundError as exc:
+        raise CommandError(f"Unknown scenario '{args.scenario}'.") from exc
     except ValidationError as exc:
         raise CommandError(_validation_message("scenarios file", exc)) from exc
     try:
         check_run_inputs(item, scenario, args.max_revisions)
     except ValueError as exc:
-        raise CommandError(f"Invalid run input: {exc}") from exc
+        raise CommandError(f"Invalid run input: {exc}.") from exc
 
     run_id = args.run_id or f"run-{uuid.uuid4().hex[:6]}"
     with open_storage(args.db) as storage:
@@ -140,7 +144,7 @@ def cmd_approve(args: argparse.Namespace) -> None:
             raise CommandError(f"No run with id '{args.run_id}'.") from exc
         except NotWaitingForReviewError as exc:
             status = graph.get_state({"configurable": {"thread_id": args.run_id}}).values["status"]
-            raise CommandError(f"Run '{args.run_id}' cannot be approved. Status: {status}") from exc
+            raise CommandError(f"Run '{args.run_id}' cannot be approved. Status: {status}.") from exc
 
     if outcome == "already_completed":
         print(f"Run '{args.run_id}' is already completed. Nothing changed.")
@@ -204,8 +208,8 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         args.handler(args)
-    except (CommandError, FixtureNotFoundError) as exc:
-        print(str(exc).strip("'\""), file=sys.stderr)
+    except CommandError as exc:
+        print(exc, file=sys.stderr)
         return 1
     return 0
 

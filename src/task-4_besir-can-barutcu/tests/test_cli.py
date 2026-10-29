@@ -83,9 +83,9 @@ def test_malformed_content_is_refused_before_anything_runs(cli):
 @pytest.mark.parametrize(
     "args, message",
     [
-        (["content-999", "--scenario", "normal-pass"], "no content item with content_id 'content-999'"),
-        (["content-001", "--scenario", "nope"], "no scenario with id 'nope'"),
-        (["content-001", "--scenario", "normal-pass", "--max-revisions", "-1"], "max_revisions must be 0 or more"),
+        (["content-999", "--scenario", "normal-pass"], "Unknown content id 'content-999'."),
+        (["content-001", "--scenario", "nope"], "Unknown scenario 'nope'."),
+        (["content-001", "--scenario", "normal-pass", "--max-revisions", "-1"], "Invalid run input: max_revisions must be 0 or more."),
     ],
 )
 def test_bad_run_arguments_are_refused(cli, args, message):
