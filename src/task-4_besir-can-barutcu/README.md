@@ -9,7 +9,7 @@ Everything runs locally. There are no model calls, API keys, network access or e
 
 ## Setup
 
-Requires Python 3.10 or newer. Tested with Python 3.12.9 on Windows.
+Requires Python 3.12. Tested with Python 3.12.9 on Windows.
 
 From this folder (`src/task-4_besir-can-barutcu`):
 
